@@ -1,17 +1,18 @@
 package sample;
 
 import javafx.application.Application;
-import javafx.scene.*;
+import javafx.scene.Group;
+import javafx.scene.Scene;
 import javafx.stage.Stage;
 
-import java.util.ArrayList;
-
-public class Main extends Application {
+public class Server extends Application {
     private Scene scene;
     private Controller controller;
 
     private static final int sceneWidth = 500;
     private static final int sceneHeight = 400;
+
+    static boolean multicastMode = true;
 
     @Override
     public void start(Stage primaryStage) throws Exception {
@@ -20,8 +21,8 @@ public class Main extends Application {
 
         controller = new Controller(scene, root);
 
-        controller.player = 1;
-        controller.setClientMode();
+        controller.player = 0;
+        controller.setServerMode();
         controller.lobby();
 
         primaryStage.setTitle("Pong");

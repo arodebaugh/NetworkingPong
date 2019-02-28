@@ -1,89 +1,321 @@
 package sample;
 
-import javafx.scene.canvas.Canvas;
-import javafx.scene.canvas.GraphicsContext;
-import javafx.scene.layout.VBox;
+import javafx.geometry.Bounds;
+import javafx.scene.Scene;
+import javafx.scene.control.Button;
 import javafx.scene.paint.Color;
-import javafx.scene.shape.ArcType;
 import javafx.scene.shape.Circle;
 import javafx.scene.shape.Rectangle;
-import javafx.stage.Stage;
-import javafx.event.*;
-import javafx.scene.input.*;
 import javafx.scene.shape.Shape;
+import javafx.scene.Group;
+
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
+import java.net.Socket;
 import java.util.ArrayList;
 
 public class Controller {
-    public Canvas canvas;
-    public VBox box;
-    private Stage primaryStage;
+    private static final int sceneWidth = 500;
+    private static final int sceneHeight = 400;
 
+    private ArrayList<Shape> nodes;
     private double mouseX;
     private double mouseY;
 
-    private double ballX = 50;
-    private double ballY = 50;
+    private double ballX = 100;
+    private double ballY = 100;
+    private double ballVx = 0;
+    private double ballVy = 0;
     private double ballSpeed = 3.0;
+    private double relativeIntersectY;
+    private double normalizedRelativeIntersectionY;
+    private double bounceAngle;
 
-    private Thread draw;
+    private double ms;
+    private double lastTime = System.currentTimeMillis();
 
-    private ArrayList<Shape> nodes;
+    private Circle ball;
 
-    public Controller() { }
+    private Rectangle leftPaddle;
+    private Rectangle rightPaddle;
 
-    public void setStage(Stage p) {
-        primaryStage = p;
+    private Rectangle leftWall;
+    private Rectangle rightWall;
+    private Rectangle topWall;
+    private Rectangle bottomWall;
+
+    private Rectangle[] leftBreak = new Rectangle[10];
+    private Rectangle[] rightBreak = new Rectangle[10];
+
+    private Button connect;
+
+    public int player = 1;
+
+    private Scene scene;
+
+    private SynchronizedQueue inQueue;
+    private SynchronizedQueue outQueue;
+
+    private int lastSent;
+
+    private boolean serverMode;
+    static boolean connected;
+
+    public Controller(Scene s, Group root) {
+        scene = s;
+
+        nodes = new ArrayList<>();
+
+        inQueue = new SynchronizedQueue();
+        outQueue = new SynchronizedQueue();
+        connected = false;
+
+        ball = new Circle(ballX, ballY, 15);
+
+        if (player == 0) {
+            leftPaddle = new Rectangle(50, mouseY, 10, 80);
+            rightPaddle = new Rectangle(sceneWidth - 70, 200, 10, 80);
+        } else if (player == 1) {
+            leftPaddle = new Rectangle(50, 200, 10, 80);
+            rightPaddle = new Rectangle(sceneWidth - 70, mouseY, 10, 80);
+        }
+
+        leftWall = new Rectangle(0,0,5,sceneHeight + 50);
+        rightWall = new Rectangle(sceneWidth - 5,0,5,sceneHeight + 50);
+        topWall = new Rectangle(0,0,sceneWidth + 50,5);
+        bottomWall = new Rectangle(0,sceneHeight - 5,sceneWidth + 50,5);
+
+        for (int x = 0; x <= 9; x++) { // 5 a row
+            if (x < 5) {
+                leftBreak[x] = new Rectangle(0, x * 82, 10, 80);
+            } else {
+                leftBreak[x] = new Rectangle(12, (x - 5) * 82, 10, 80);
+            }
+        }
+
+        for (int x = 0; x <= 9; x++) { // 5 a row
+            if (x < 5) {
+                rightBreak[x] = new Rectangle(sceneWidth - 10, x * 82, 10, 80);
+            } else {
+                rightBreak[x] = new Rectangle(sceneWidth - 22, (x - 5) * 82, 10, 80);
+            }
+        }
+
+        connect = new Button("START");
+
+        leftWall.setFill(Color.WHITE);
+        rightWall.setFill(Color.WHITE);
+        topWall.setFill(Color.WHITE);
+        bottomWall.setFill(Color.WHITE);
+
+        nodes.add(ball);
+        nodes.add(leftPaddle);
+        nodes.add(rightPaddle);
+        nodes.add(leftWall);
+        nodes.add(rightWall);
+        nodes.add(topWall);
+        nodes.add(bottomWall);
+
+        for (int x = 0; x <= 9; x++) {
+            nodes.add(leftBreak[x]);
+            nodes.add(rightBreak[x]);
+        }
+
+        root.getChildren().addAll(nodes);
+        root.getChildren().add(connect);
     }
 
-    public void initialize() {
-        GraphicsContext gc = canvas.getGraphicsContext2D();
-        drawShapes(gc);
+    void setServerMode() {
+        serverMode = true;
+    }
 
-        /*canvas.setOnMouseMoved(event -> {
-            mouseX = event.getSceneX();
-            mouseY = event.getSceneY();
+    void setClientMode() {
+        serverMode = false;
+    }
+
+    void lobby() {
+        connect.setOnAction(event -> {
+            connect.setVisible(false);
+            connected = true;
+
+            if (serverMode) {
+                // We're a server: create a thread for listening for connecting clients
+                if (player == 0) {
+                    ConnectToNewClients connectToNewClients = new ConnectToNewClients(this, 8080, inQueue, outQueue, 1, rightPaddle);
+                    Thread connectThread = new Thread(connectToNewClients);
+                    connectThread.start();
+                } else if (player == 1) {
+                    //   Thread 2: handles communication FROM server TO client
+                    ConnectToNewClients connectToNewClients = new ConnectToNewClients(this, 8080, inQueue, outQueue, 0, leftPaddle);
+                    Thread connectThread = new Thread(connectToNewClients);
+                    connectThread.start();
+                }
+
+            } else {
+
+                // We're a client: connect to a server
+                try {
+                    Socket socketClientSide = new Socket("127.0.0.1", 8080);
+
+                    // The socketClientSide provides 2 separate streams for 2-way communication
+                    //   the InputStream is for communication FROM server TO client
+                    //   the OutputStream is for communication TO server FROM client
+                    // Create data reader and writer from those stream (NOTE: ObjectOutputStream MUST be created FIRST)
+
+                    // Every client prepares for communication with its server by creating 2 new threads:
+                    //   Thread 1: handles communication TO server FROM client
+                    CommunicationOut communicationOut = new CommunicationOut(socketClientSide, new ObjectOutputStream(socketClientSide.getOutputStream()), outQueue);
+                    Thread communicationOutThread = new Thread(communicationOut);
+                    communicationOutThread.start();
+
+                    if (player == 0) {
+                        //   Thread 2: handles communication FROM server TO client
+                        CommunicationIn communicationIn = new CommunicationIn(this, socketClientSide, new ObjectInputStream(socketClientSide.getInputStream()), inQueue, null, 1, rightPaddle);
+                        Thread communicationInThread = new Thread(communicationIn);
+                        communicationInThread.start();
+                    } else if (player == 1) {
+                        //   Thread 2: handles communication FROM server TO client
+                        CommunicationIn communicationIn = new CommunicationIn(this, socketClientSide, new ObjectInputStream(socketClientSide.getInputStream()), inQueue, null, 0, leftPaddle);
+                        Thread communicationInThread = new Thread(communicationIn);
+                        communicationInThread.start();
+                    }
+
+                } catch (Exception ex) {
+                    ex.printStackTrace();
+                }
+
+                // We connected!
+            }
+
+            Message message = new Message(player, 9999);
+            boolean putSucceeded = outQueue.put(message);
+            while (!putSucceeded) {
+                Thread.currentThread().yield();
+                putSucceeded = outQueue.put(message);
+            }
         });
+    }
+
+    void start() {
+        setListeners();
 
         Thread draw = new Thread(() -> {
             while (true) {
-                drawShapes(gc);
+                tick();
                 try {
-                    Thread.sleep(50);
+                    Thread.sleep(25);
                 } catch (InterruptedException err) {
                     System.out.println(err);
                 }
             }
         });
-
-        draw.start();*/
+        draw.start();
     }
 
-    private void drawShapes(GraphicsContext gc) {
-        gc.clearRect(0, 0, 600, 400);
-        gc.setFill(Color.WHITE);
-        gc.setStroke(Color.WHITE);
+    private void tick() {
+        testBounds();
+        setBallPosition();
+    }
 
-        ballX = ballX + ballSpeed * 1.0; // Direction
-        ballY = ballY + ballSpeed * 1.0;
+    private void sendToServer() {
+        if ((int) Math.round(mouseY) != lastSent) {
 
-        nodes = new ArrayList<>();
+            Message message = new Message(player, (int) Math.round(mouseY));
 
-        Circle ball = new Circle(ballX, ballY, 20);
-        nodes.add(ball);
+            System.out.println("player: " + message.sender());
+            System.out.println("y: " + message.data());
 
-        Rectangle leftPaddle;
-
-        // gc.fillOval(ballX , ballY, 20, 20);
-
-        // gc.setLineWidth(8);
-        if ((mouseY + 40) < 400) {
-            leftPaddle = new Rectangle(10, mouseY + 40, 8, 8);
-        } else {
-            leftPaddle = new Rectangle(10, mouseY, 8, 8);
+            boolean putSucceeded = outQueue.put(message);
+            while (!putSucceeded) {
+                Thread.currentThread().yield();
+                putSucceeded = outQueue.put(message);
+            }
         }
 
-        nodes.add(leftPaddle);
+        lastSent = (int) Math.round(mouseY);
+    }
 
+    private void testBounds() {
+        Bounds leftPaddleBounds = leftPaddle.getBoundsInParent();
+        Bounds rightPaddleBounds = rightPaddle.getBoundsInParent();
+        Bounds leftWallBounds = leftWall.getBoundsInParent();
+        Bounds rightWallBounds = rightWall.getBoundsInParent();
+        Bounds topWallBounds = topWall.getBoundsInParent();
+        Bounds bottomWallBounds = bottomWall.getBoundsInParent();
+        Bounds ballBounds = ball.getBoundsInParent();
 
+        if (ballBounds.intersects(leftPaddleBounds)) {
+            if (ballSpeed < 10.0) {
+                ballSpeed += .5;
+            }
+
+            relativeIntersectY = (ball.getLayoutY() + (5/2)) - ball.getLayoutX();
+            normalizedRelativeIntersectionY = (relativeIntersectY / (5/2));
+            bounceAngle = normalizedRelativeIntersectionY * 75;
+        } else if (ballBounds.intersects(rightPaddleBounds)) {
+            if (ballSpeed < 10.0) {
+                ballSpeed += .5;
+            }
+
+            relativeIntersectY = (ball.getLayoutY() + (5/2)) - ball.getLayoutX();
+            normalizedRelativeIntersectionY = (relativeIntersectY / (5/2));
+            bounceAngle = normalizedRelativeIntersectionY * 75;
+        } else if (ballBounds.intersects(rightWallBounds)) {
+            relativeIntersectY = (ball.getLayoutY() + (5/2)) - ball.getLayoutX();
+            normalizedRelativeIntersectionY = (relativeIntersectY / (5/2));
+            bounceAngle = normalizedRelativeIntersectionY * 75;
+        } else if (ballBounds.intersects(leftWallBounds)) {
+            relativeIntersectY = (ball.getLayoutY() + (5/2)) - ball.getLayoutX();
+            normalizedRelativeIntersectionY = (relativeIntersectY / (5/2));
+            bounceAngle = normalizedRelativeIntersectionY * 75;
+        } else if (ballBounds.intersects(bottomWallBounds)) {
+            relativeIntersectY = (ball.getLayoutY() + (5/2)) - ball.getLayoutX();
+            normalizedRelativeIntersectionY = (relativeIntersectY / (5/2));
+            bounceAngle = normalizedRelativeIntersectionY * 75;
+        } else if (ballBounds.intersects(topWallBounds)) {
+            relativeIntersectY = (ball.getLayoutY() + (5/2)) - ball.getLayoutX();
+            normalizedRelativeIntersectionY = (relativeIntersectY / (5/2));
+            bounceAngle = normalizedRelativeIntersectionY * 75;
+        } else {
+            for (int x = 0; x <= 9; x++) {
+                if (ballBounds.intersects(leftBreak[x].getBoundsInParent())) {
+                    relativeIntersectY = (ball.getLayoutY() + (5/2)) - ball.getLayoutX();
+                    normalizedRelativeIntersectionY = (relativeIntersectY / (5/2));
+                    bounceAngle = normalizedRelativeIntersectionY * 75;
+                    leftBreak[x].setVisible(false);
+                } else if (ballBounds.intersects(rightBreak[x].getBoundsInParent())) {
+                    relativeIntersectY = (ball.getLayoutY() + (5 / 2)) - ball.getLayoutX();
+                    normalizedRelativeIntersectionY = (relativeIntersectY / (5 / 2));
+                    bounceAngle = normalizedRelativeIntersectionY * 75;
+                    rightBreak[x].setVisible(false);
+                }
+            }
+        }
+
+        ballVx = (ballSpeed * Math.cos(bounceAngle));
+        ballVy = (ballSpeed * -Math.sin(bounceAngle));
+    }
+
+    private void setBallPosition() {
+        ballX += ballVx;
+        ballY += ballVy;
+
+        ball.setLayoutX(ballX);
+        ball.setLayoutY(ballY);
+    }
+
+    private void setListeners() {
+        scene.setOnMouseMoved(event -> {
+            mouseX = event.getX();
+            mouseY = event.getY();
+
+            if (player == 0) {
+                leftPaddle.setY(mouseY);
+            } else if (player == 1) {
+                rightPaddle.setY(mouseY);
+            }
+
+            sendToServer();
+        });
     }
 }
