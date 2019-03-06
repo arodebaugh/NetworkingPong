@@ -3,6 +3,9 @@ package sample;
 import javafx.geometry.Bounds;
 import javafx.scene.Scene;
 import javafx.scene.control.Button;
+import javafx.scene.control.TextField;
+import javafx.scene.layout.HBox;
+import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
 import javafx.scene.shape.Circle;
 import javafx.scene.shape.Rectangle;
@@ -47,7 +50,9 @@ public class Controller {
     private Rectangle[] leftBreak = new Rectangle[10];
     private Rectangle[] rightBreak = new Rectangle[10];
 
+    private HBox hbox;
     private Button connect;
+    private TextField ip;
 
     public int player = 1;
 
@@ -101,7 +106,9 @@ public class Controller {
             }
         }
 
+        hbox = new HBox();
         connect = new Button("START");
+        ip = new TextField("");
 
         leftWall.setFill(Color.WHITE);
         rightWall.setFill(Color.WHITE);
@@ -121,8 +128,10 @@ public class Controller {
             nodes.add(rightBreak[x]);
         }
 
+        hbox.getChildren().add(connect);
+
         root.getChildren().addAll(nodes);
-        root.getChildren().add(connect);
+        root.getChildren().addAll(hbox);
     }
 
     void setServerMode() {
@@ -133,29 +142,33 @@ public class Controller {
         serverMode = false;
     }
 
+    void disconnect() {
+        connected = false;
+        connect.setVisible(true);
+        lobby();
+    }
+
     void lobby() {
         connect.setOnAction(event -> {
             connect.setVisible(false);
+            ip.setVisible(false);
             connected = true;
 
             if (serverMode) {
-                // We're a server: create a thread for listening for connecting clients
                 if (player == 0) {
-                    ConnectToNewClients connectToNewClients = new ConnectToNewClients(this, 8080, inQueue, outQueue, 1, rightPaddle);
+                    ConnectToNewClients connectToNewClients = new ConnectToNewClients(this, 8080, inQueue, outQueue, 1, rightPaddle, ball, ip);
                     Thread connectThread = new Thread(connectToNewClients);
                     connectThread.start();
                 } else if (player == 1) {
                     //   Thread 2: handles communication FROM server TO client
-                    ConnectToNewClients connectToNewClients = new ConnectToNewClients(this, 8080, inQueue, outQueue, 0, leftPaddle);
+                    ConnectToNewClients connectToNewClients = new ConnectToNewClients(this, 8080, inQueue, outQueue, 0, leftPaddle, ball, ip);
                     Thread connectThread = new Thread(connectToNewClients);
                     connectThread.start();
                 }
-
             } else {
-
                 // We're a client: connect to a server
                 try {
-                    Socket socketClientSide = new Socket("127.0.0.1", 8080);
+                    Socket socketClientSide = new Socket(ip.getText(), 8080);
 
                     // The socketClientSide provides 2 separate streams for 2-way communication
                     //   the InputStream is for communication FROM server TO client
@@ -170,12 +183,12 @@ public class Controller {
 
                     if (player == 0) {
                         //   Thread 2: handles communication FROM server TO client
-                        CommunicationIn communicationIn = new CommunicationIn(this, socketClientSide, new ObjectInputStream(socketClientSide.getInputStream()), inQueue, null, 1, rightPaddle);
+                        CommunicationIn communicationIn = new CommunicationIn(this, socketClientSide, new ObjectInputStream(socketClientSide.getInputStream()), inQueue, null, 1, rightPaddle, ball);
                         Thread communicationInThread = new Thread(communicationIn);
                         communicationInThread.start();
                     } else if (player == 1) {
                         //   Thread 2: handles communication FROM server TO client
-                        CommunicationIn communicationIn = new CommunicationIn(this, socketClientSide, new ObjectInputStream(socketClientSide.getInputStream()), inQueue, null, 0, leftPaddle);
+                        CommunicationIn communicationIn = new CommunicationIn(this, socketClientSide, new ObjectInputStream(socketClientSide.getInputStream()), inQueue, null, 0, leftPaddle, ball);
                         Thread communicationInThread = new Thread(communicationIn);
                         communicationInThread.start();
                     }
@@ -187,7 +200,7 @@ public class Controller {
                 // We connected!
             }
 
-            Message message = new Message(player, 9999);
+            Message message = new Message(player, 9999, ballX, ballY);
             boolean putSucceeded = outQueue.put(message);
             while (!putSucceeded) {
                 Thread.currentThread().yield();
@@ -214,25 +227,20 @@ public class Controller {
 
     private void tick() {
         testBounds();
-        setBallPosition();
+        if (serverMode) {
+            setBallPosition();
+        }
+        sendToServer();
     }
 
     private void sendToServer() {
-        if ((int) Math.round(mouseY) != lastSent) {
+        Message message = new Message(player, (int) Math.round(mouseY), ballX, ballY);
 
-            Message message = new Message(player, (int) Math.round(mouseY));
-
-            System.out.println("player: " + message.sender());
-            System.out.println("y: " + message.data());
-
-            boolean putSucceeded = outQueue.put(message);
-            while (!putSucceeded) {
-                Thread.currentThread().yield();
-                putSucceeded = outQueue.put(message);
-            }
+        boolean putSucceeded = outQueue.put(message);
+        while (!putSucceeded) {
+            Thread.currentThread().yield();
+            putSucceeded = outQueue.put(message);
         }
-
-        lastSent = (int) Math.round(mouseY);
     }
 
     private void testBounds() {
@@ -314,8 +322,6 @@ public class Controller {
             } else if (player == 1) {
                 rightPaddle.setY(mouseY);
             }
-
-            sendToServer();
         });
     }
 }

@@ -25,7 +25,7 @@ public class Server extends Application {
         controller.setServerMode();
         controller.lobby();
 
-        primaryStage.setTitle("Pong");
+        primaryStage.setTitle("Pong Host");
         primaryStage.setScene(scene);
         primaryStage.show();
     }

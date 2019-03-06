@@ -24,7 +24,7 @@ public class Main extends Application {
         controller.setClientMode();
         controller.lobby();
 
-        primaryStage.setTitle("Pong");
+        primaryStage.setTitle("Pong Client");
         primaryStage.setScene(scene);
         primaryStage.show();
     }

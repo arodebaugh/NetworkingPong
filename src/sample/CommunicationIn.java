@@ -2,6 +2,7 @@ package sample;
 
 import javafx.application.Platform;
 import javafx.scene.control.TextField;
+import javafx.scene.shape.Circle;
 import javafx.scene.shape.Rectangle;
 
 import java.io.EOFException;
@@ -17,11 +18,12 @@ public class CommunicationIn implements Runnable {
     private boolean serverMode;
     private int player;
     private Rectangle paddle;
+    private Circle ball;
     private Controller controller;
 
     // CommunicationIn reads from a Socket and puts data into the Program's inQueue
 
-    CommunicationIn(Controller c, Socket s, ObjectInputStream in, SynchronizedQueue inQ, SynchronizedQueue outQ, int p, Rectangle pa) {
+    CommunicationIn(Controller c, Socket s, ObjectInputStream in, SynchronizedQueue inQ, SynchronizedQueue outQ, int p, Rectangle pa, Circle b) {
         controller = c;
         socket = s;
         messageReader = in;
@@ -32,6 +34,7 @@ public class CommunicationIn implements Runnable {
         serverMode = (outQ != null);
         player = p;
         paddle = pa;
+        ball = b;
     }
 
     @Override
@@ -63,6 +66,11 @@ public class CommunicationIn implements Runnable {
                     Platform.runLater(() -> {
                         System.out.println(finalMessage.data());
                         paddle.setY(finalMessage.data());
+
+                        if (!serverMode) {
+                            ball.setLayoutX(finalMessage.ballX());
+                            ball.setLayoutY(finalMessage.ballY());
+                        }
                     });
                 }
 

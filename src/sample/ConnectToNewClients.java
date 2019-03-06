@@ -2,12 +2,15 @@ package sample;
 
 import javafx.application.Platform;
 import javafx.scene.control.TextField;
+import javafx.scene.shape.Circle;
 import javafx.scene.shape.Rectangle;
 
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
+import java.net.InetAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.net.UnknownHostException;
 import java.util.ArrayList;
 
 public class ConnectToNewClients implements Runnable {
@@ -19,6 +22,8 @@ public class ConnectToNewClients implements Runnable {
     private int player;
     private Rectangle paddle;
     private Controller controller;
+    private Circle ball;
+    private TextField ip;
 
     // ConnectToNewClients is server's code that listens on ServerSocket's port for connecting clients
     // When a new client's connection is accepted:
@@ -26,16 +31,18 @@ public class ConnectToNewClients implements Runnable {
     //    2. a CommunicationOut thread is created to write data to that client (via outQueue)
     //    3. (if multi-cast): collect outputStreams together to outQueue writes data to ALL clients
 
-    ConnectToNewClients(Controller c, int port, SynchronizedQueue inQ, SynchronizedQueue outQ, int p, Rectangle pa) {
+    ConnectToNewClients(Controller c, int port, SynchronizedQueue inQ, SynchronizedQueue outQ, int p, Rectangle pa, Circle b, TextField i) {
         controller = c;
         connectionPort = port;
         inQueue = inQ;
         outQueue = outQ;
+        ball = b;
         if (Server.multicastMode) {
             clientOutputStreams = new ArrayList<ObjectOutputStream>();
         }
         player = p;
         paddle = pa;
+        ip = i;
     }
 
     public void run() {
@@ -78,7 +85,7 @@ public class ConnectToNewClients implements Runnable {
                 communicationOutThread.start();
 
                 //   Thread 2: handles communication FROM that client TO server
-                CommunicationIn communicationIn = new CommunicationIn(controller, socketServerSide, dataReader, inQueue, outQueue, player, paddle);
+                CommunicationIn communicationIn = new CommunicationIn(controller, socketServerSide, dataReader, inQueue, outQueue, player, paddle, ball);
                 Thread communicationInThread = new Thread(communicationIn);
                 communicationInThread.start();
             }
