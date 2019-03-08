@@ -31,7 +31,7 @@ public class Message implements Serializable {
     double ballY() { return y; }
 
     public String toString() {
-        return "\"" + data + "\" from: " + sender;
+        return "paddle \"" + data + "\" Ball XY \"" + x + ", " + y + "\" from: " + sender;
     }
 
 }

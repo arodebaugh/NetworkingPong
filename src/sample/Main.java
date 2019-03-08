@@ -4,8 +4,6 @@ import javafx.application.Application;
 import javafx.scene.*;
 import javafx.stage.Stage;
 
-import java.util.ArrayList;
-
 public class Main extends Application {
     private Scene scene;
     private Controller controller;

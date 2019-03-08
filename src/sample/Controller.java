@@ -57,6 +57,7 @@ public class Controller {
     public int player = 1;
 
     private Scene scene;
+    private Group root;
 
     private SynchronizedQueue inQueue;
     private SynchronizedQueue outQueue;
@@ -66,8 +67,9 @@ public class Controller {
     private boolean serverMode;
     static boolean connected;
 
-    public Controller(Scene s, Group root) {
+    public Controller(Scene s, Group r) {
         scene = s;
+        root = r;
 
         nodes = new ArrayList<>();
 
@@ -128,7 +130,12 @@ public class Controller {
             nodes.add(rightBreak[x]);
         }
 
-        hbox.getChildren().add(connect);
+        hbox.getChildren().add(ip);
+
+        if (!serverMode) {
+            hbox.getChildren().add(connect);
+        }
+
 
         root.getChildren().addAll(nodes);
         root.getChildren().addAll(hbox);
@@ -148,24 +155,39 @@ public class Controller {
         lobby();
     }
 
+    void reset() {
+        System.out.println("RESET");
+        ballX = 100;
+        ballY = 100;
+        ball.setLayoutX(100);
+        ball.setCenterY(100);
+        ballSpeed = 3.0;
+        ballVx = 0;
+        ballVy = 0;
+    }
+
     void lobby() {
+        if (serverMode) {
+            connected = true;
+
+            if (player == 0) {
+                ConnectToNewClients connectToNewClients = new ConnectToNewClients(this, 8080, inQueue, outQueue, 1, rightPaddle, ball, ip);
+                Thread connectThread = new Thread(connectToNewClients);
+                connectThread.start();
+            } else if (player == 1) {
+                //   Thread 2: handles communication FROM server TO client
+                ConnectToNewClients connectToNewClients = new ConnectToNewClients(this, 8080, inQueue, outQueue, 0, leftPaddle, ball, ip);
+                Thread connectThread = new Thread(connectToNewClients);
+                connectThread.start();
+            }
+        }
+
         connect.setOnAction(event -> {
             connect.setVisible(false);
             ip.setVisible(false);
             connected = true;
 
-            if (serverMode) {
-                if (player == 0) {
-                    ConnectToNewClients connectToNewClients = new ConnectToNewClients(this, 8080, inQueue, outQueue, 1, rightPaddle, ball, ip);
-                    Thread connectThread = new Thread(connectToNewClients);
-                    connectThread.start();
-                } else if (player == 1) {
-                    //   Thread 2: handles communication FROM server TO client
-                    ConnectToNewClients connectToNewClients = new ConnectToNewClients(this, 8080, inQueue, outQueue, 0, leftPaddle, ball, ip);
-                    Thread connectThread = new Thread(connectToNewClients);
-                    connectThread.start();
-                }
-            } else {
+            if (!serverMode) {
                 // We're a client: connect to a server
                 try {
                     Socket socketClientSide = new Socket(ip.getText(), 8080);
@@ -226,10 +248,11 @@ public class Controller {
     }
 
     private void tick() {
-        testBounds();
         if (serverMode) {
             setBallPosition();
+            testBounds();
         }
+        walls();
         sendToServer();
     }
 
@@ -243,6 +266,24 @@ public class Controller {
         }
     }
 
+    private void walls() {
+        Bounds ballBounds = ball.getBoundsInParent();
+
+        for (int x = 0; x <= 9; x++) {
+            if (ballBounds.intersects(leftBreak[x].getBoundsInParent())) {
+                relativeIntersectY = (ball.getLayoutY() + (5/2)) - ball.getLayoutX();
+                normalizedRelativeIntersectionY = (relativeIntersectY / (5/2));
+                bounceAngle = normalizedRelativeIntersectionY * 75;
+                leftBreak[x].setVisible(false);
+            } else if (ballBounds.intersects(rightBreak[x].getBoundsInParent())) {
+                relativeIntersectY = (ball.getLayoutY() + (5 / 2)) - ball.getLayoutX();
+                normalizedRelativeIntersectionY = (relativeIntersectY / (5 / 2));
+                bounceAngle = normalizedRelativeIntersectionY * 75;
+                rightBreak[x].setVisible(false);
+            }
+        }
+    }
+
     private void testBounds() {
         Bounds leftPaddleBounds = leftPaddle.getBoundsInParent();
         Bounds rightPaddleBounds = rightPaddle.getBoundsInParent();
@@ -252,8 +293,10 @@ public class Controller {
         Bounds bottomWallBounds = bottomWall.getBoundsInParent();
         Bounds ballBounds = ball.getBoundsInParent();
 
+        Bounds screenBounds = root.getBoundsInParent();
+
         if (ballBounds.intersects(leftPaddleBounds)) {
-            if (ballSpeed < 10.0) {
+            if (ballSpeed < 6.0) {
                 ballSpeed += .5;
             }
 
@@ -261,18 +304,10 @@ public class Controller {
             normalizedRelativeIntersectionY = (relativeIntersectY / (5/2));
             bounceAngle = normalizedRelativeIntersectionY * 75;
         } else if (ballBounds.intersects(rightPaddleBounds)) {
-            if (ballSpeed < 10.0) {
+            if (ballSpeed < 6.0) {
                 ballSpeed += .5;
             }
 
-            relativeIntersectY = (ball.getLayoutY() + (5/2)) - ball.getLayoutX();
-            normalizedRelativeIntersectionY = (relativeIntersectY / (5/2));
-            bounceAngle = normalizedRelativeIntersectionY * 75;
-        } else if (ballBounds.intersects(rightWallBounds)) {
-            relativeIntersectY = (ball.getLayoutY() + (5/2)) - ball.getLayoutX();
-            normalizedRelativeIntersectionY = (relativeIntersectY / (5/2));
-            bounceAngle = normalizedRelativeIntersectionY * 75;
-        } else if (ballBounds.intersects(leftWallBounds)) {
             relativeIntersectY = (ball.getLayoutY() + (5/2)) - ball.getLayoutX();
             normalizedRelativeIntersectionY = (relativeIntersectY / (5/2));
             bounceAngle = normalizedRelativeIntersectionY * 75;
@@ -284,20 +319,12 @@ public class Controller {
             relativeIntersectY = (ball.getLayoutY() + (5/2)) - ball.getLayoutX();
             normalizedRelativeIntersectionY = (relativeIntersectY / (5/2));
             bounceAngle = normalizedRelativeIntersectionY * 75;
-        } else {
-            for (int x = 0; x <= 9; x++) {
-                if (ballBounds.intersects(leftBreak[x].getBoundsInParent())) {
-                    relativeIntersectY = (ball.getLayoutY() + (5/2)) - ball.getLayoutX();
-                    normalizedRelativeIntersectionY = (relativeIntersectY / (5/2));
-                    bounceAngle = normalizedRelativeIntersectionY * 75;
-                    leftBreak[x].setVisible(false);
-                } else if (ballBounds.intersects(rightBreak[x].getBoundsInParent())) {
-                    relativeIntersectY = (ball.getLayoutY() + (5 / 2)) - ball.getLayoutX();
-                    normalizedRelativeIntersectionY = (relativeIntersectY / (5 / 2));
-                    bounceAngle = normalizedRelativeIntersectionY * 75;
-                    rightBreak[x].setVisible(false);
-                }
-            }
+        } else if (ball.getLayoutX() > (sceneWidth + 20)) { // player 0 scores
+            reset();
+            return;
+        } else if (ball.getLayoutX() < -100) { // player 1 scores
+            reset();
+            return;
         }
 
         ballVx = (ballSpeed * Math.cos(bounceAngle));

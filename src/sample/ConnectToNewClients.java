@@ -58,6 +58,14 @@ public class ConnectToNewClients implements Runnable {
             // Start listening for client connections
             connectionSocket = new ServerSocket(connectionPort);
 
+            Platform.runLater(() -> {
+                try {
+                    ip.setText(InetAddress.getLocalHost().getHostAddress());
+                } catch (UnknownHostException err) {
+                    err.printStackTrace();
+                }
+            });
+
             while (Controller.connected && !Thread.interrupted()) {
                 // Wait until a client tries to connect
                 Socket socketServerSide = connectionSocket.accept();
