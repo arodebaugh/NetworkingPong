@@ -12,7 +12,7 @@ public class Server extends Application {
     private static final int sceneWidth = 500;
     private static final int sceneHeight = 400;
 
-    static boolean multicastMode = true;
+    static boolean multicastMode = false;
 
     @Override
     public void start(Stage primaryStage) throws Exception {

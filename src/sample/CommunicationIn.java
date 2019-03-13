@@ -63,11 +63,17 @@ public class CommunicationIn implements Runnable {
                         controller.start();
                     }
 
+                    if (finalMessage.data() == 7777) {
+                        controller.resetWalls();
+                    }
+
                     Platform.runLater(() -> {
                         System.out.println(finalMessage.data());
                         paddle.setY(finalMessage.data());
 
                         if (!serverMode) {
+                            controller.ballX = finalMessage.ballX();
+                            controller.ballY = finalMessage.ballY();
                             ball.setLayoutX(finalMessage.ballX());
                             ball.setLayoutY(finalMessage.ballY());
                         }

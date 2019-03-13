@@ -33,7 +33,7 @@ public class SynchronizedQueue {
             // Increment amount of data now in queue (which gets used to decide if there is data to get)
             dataAmount += 1;
             // tell caller that put succeeded
-            System.out.println("PUT " + newValue);
+            //System.out.println("PUT " + newValue);
             return true;
         } else {
             // no space in queue, don't put newValue in queue, and tell caller that put failed
@@ -57,7 +57,7 @@ public class SynchronizedQueue {
             dataAmount -= 1;
 
             // by returning a file, we're letting the caller know that get succeeded
-            System.out.println("GOT " + objToReturn);
+            //System.out.println("GOT " + objToReturn);
             return objToReturn;
         } else {
             // by returning NO file, we're letting the caller know that get failed

@@ -25,11 +25,11 @@ public class Controller {
     private double mouseX;
     private double mouseY;
 
-    private double ballX = 100;
-    private double ballY = 100;
+    double ballX = 100;
+    double ballY = 100;
     private double ballVx = 0;
     private double ballVy = 0;
-    private double ballSpeed = 3.0;
+    private double ballSpeed = 4.0;
     private double relativeIntersectY;
     private double normalizedRelativeIntersectionY;
     private double bounceAngle;
@@ -160,10 +160,29 @@ public class Controller {
         ballX = 100;
         ballY = 100;
         ball.setLayoutX(100);
-        ball.setCenterY(100);
+        ball.setLayoutY(100);
         ballSpeed = 3.0;
         ballVx = 0;
         ballVy = 0;
+
+        Message message = new Message(player, 7777, ballX, ballY);
+        boolean putSucceeded = outQueue.put(message);
+        while (!putSucceeded) {
+            Thread.currentThread().yield();
+            putSucceeded = outQueue.put(message);
+        }
+
+        resetWalls();
+    }
+
+    void resetWalls() {
+        for (int x = 0; x <= 9; x++) {
+            leftBreak[x].setWidth(10);
+            leftBreak[x].setHeight(80);
+
+            rightBreak[x].setWidth(10);
+            rightBreak[x].setHeight(80);
+        }
     }
 
     void lobby() {
@@ -274,61 +293,64 @@ public class Controller {
                 relativeIntersectY = (ball.getLayoutY() + (5/2)) - ball.getLayoutX();
                 normalizedRelativeIntersectionY = (relativeIntersectY / (5/2));
                 bounceAngle = normalizedRelativeIntersectionY * 75;
-                leftBreak[x].setVisible(false);
+                leftBreak[x].setWidth(0);
+                leftBreak[x].setHeight(0);
             } else if (ballBounds.intersects(rightBreak[x].getBoundsInParent())) {
                 relativeIntersectY = (ball.getLayoutY() + (5 / 2)) - ball.getLayoutX();
                 normalizedRelativeIntersectionY = (relativeIntersectY / (5 / 2));
                 bounceAngle = normalizedRelativeIntersectionY * 75;
-                rightBreak[x].setVisible(false);
+                rightBreak[x].setWidth(0);
+                rightBreak[x].setHeight(0);
             }
         }
     }
 
     private void testBounds() {
-        Bounds leftPaddleBounds = leftPaddle.getBoundsInParent();
-        Bounds rightPaddleBounds = rightPaddle.getBoundsInParent();
-        Bounds leftWallBounds = leftWall.getBoundsInParent();
-        Bounds rightWallBounds = rightWall.getBoundsInParent();
-        Bounds topWallBounds = topWall.getBoundsInParent();
-        Bounds bottomWallBounds = bottomWall.getBoundsInParent();
-        Bounds ballBounds = ball.getBoundsInParent();
+        try {
+            Bounds leftPaddleBounds = leftPaddle.getBoundsInParent();
+            Bounds rightPaddleBounds = rightPaddle.getBoundsInParent();
+            Bounds topWallBounds = topWall.getBoundsInParent();
+            Bounds bottomWallBounds = bottomWall.getBoundsInParent();
+            Bounds ballBounds = ball.getBoundsInParent();
 
-        Bounds screenBounds = root.getBoundsInParent();
+            if (ballBounds.intersects(leftPaddleBounds)) {
+                if (ballSpeed < 6.0) {
+                    ballSpeed += 1;
+                }
 
-        if (ballBounds.intersects(leftPaddleBounds)) {
-            if (ballSpeed < 6.0) {
-                ballSpeed += .5;
+                relativeIntersectY = (ball.getLayoutY() + (5 / 2)) - ball.getLayoutX();
+                normalizedRelativeIntersectionY = (relativeIntersectY / (5 / 2));
+                bounceAngle = normalizedRelativeIntersectionY * 75;
+            } else if (ballBounds.intersects(rightPaddleBounds)) {
+                if (ballSpeed < 6.0) {
+                    ballSpeed += 1;
+                }
+
+                relativeIntersectY = (ball.getLayoutY() + (5 / 2)) - ball.getLayoutX();
+                normalizedRelativeIntersectionY = (relativeIntersectY / (5 / 2));
+                bounceAngle = normalizedRelativeIntersectionY * 75;
+            } else if (ballBounds.intersects(bottomWallBounds)) {
+                relativeIntersectY = (ball.getLayoutY() + (5 / 2)) - ball.getLayoutX();
+                normalizedRelativeIntersectionY = (relativeIntersectY / (5 / 2));
+                bounceAngle = normalizedRelativeIntersectionY * 75;
+            } else if (ballBounds.intersects(topWallBounds)) {
+                relativeIntersectY = (ball.getLayoutY() + (5 / 2)) - ball.getLayoutX();
+                normalizedRelativeIntersectionY = (relativeIntersectY / (5 / 2));
+                bounceAngle = normalizedRelativeIntersectionY * 75;
+            } else if (ball.getLayoutX() > (sceneWidth + 20)) { // player 0 scores
+                reset();
+                return;
+            } else if (ball.getLayoutX() < -100) { // player 1 scores
+                reset();
+                return;
             }
 
-            relativeIntersectY = (ball.getLayoutY() + (5/2)) - ball.getLayoutX();
-            normalizedRelativeIntersectionY = (relativeIntersectY / (5/2));
-            bounceAngle = normalizedRelativeIntersectionY * 75;
-        } else if (ballBounds.intersects(rightPaddleBounds)) {
-            if (ballSpeed < 6.0) {
-                ballSpeed += .5;
-            }
+            ballVx = (ballSpeed * Math.cos(bounceAngle));
+            ballVy = (ballSpeed * -Math.sin(bounceAngle));
 
-            relativeIntersectY = (ball.getLayoutY() + (5/2)) - ball.getLayoutX();
-            normalizedRelativeIntersectionY = (relativeIntersectY / (5/2));
-            bounceAngle = normalizedRelativeIntersectionY * 75;
-        } else if (ballBounds.intersects(bottomWallBounds)) {
-            relativeIntersectY = (ball.getLayoutY() + (5/2)) - ball.getLayoutX();
-            normalizedRelativeIntersectionY = (relativeIntersectY / (5/2));
-            bounceAngle = normalizedRelativeIntersectionY * 75;
-        } else if (ballBounds.intersects(topWallBounds)) {
-            relativeIntersectY = (ball.getLayoutY() + (5/2)) - ball.getLayoutX();
-            normalizedRelativeIntersectionY = (relativeIntersectY / (5/2));
-            bounceAngle = normalizedRelativeIntersectionY * 75;
-        } else if (ball.getLayoutX() > (sceneWidth + 20)) { // player 0 scores
-            reset();
-            return;
-        } else if (ball.getLayoutX() < -100) { // player 1 scores
-            reset();
-            return;
+        } catch (Exception ex) {
+            ex.printStackTrace();
         }
-
-        ballVx = (ballSpeed * Math.cos(bounceAngle));
-        ballVy = (ballSpeed * -Math.sin(bounceAngle));
     }
 
     private void setBallPosition() {
