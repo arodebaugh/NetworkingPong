@@ -4,19 +4,20 @@ import javafx.application.Application;
 import javafx.scene.Group;
 import javafx.scene.Scene;
 import javafx.stage.Stage;
+import javafx.scene.layout.BorderPane;
 
 public class Server extends Application {
     private Scene scene;
     private Controller controller;
 
     private static final int sceneWidth = 500;
-    private static final int sceneHeight = 400;
+    private static final int sceneHeight = 430;
 
     static boolean multicastMode = false;
 
     @Override
     public void start(Stage primaryStage) throws Exception {
-        Group root = new Group();
+        BorderPane root = new BorderPane();
         scene = new Scene(root, sceneWidth, sceneHeight);
 
         controller = new Controller(scene, root);

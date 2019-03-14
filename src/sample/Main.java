@@ -2,6 +2,7 @@ package sample;
 
 import javafx.application.Application;
 import javafx.scene.*;
+import javafx.scene.layout.BorderPane;
 import javafx.stage.Stage;
 
 public class Main extends Application {
@@ -9,11 +10,11 @@ public class Main extends Application {
     private Controller controller;
 
     private static final int sceneWidth = 500;
-    private static final int sceneHeight = 400;
+    private static final int sceneHeight = 430;
 
     @Override
     public void start(Stage primaryStage) throws Exception {
-        Group root = new Group();
+        BorderPane root = new BorderPane();
         scene = new Scene(root, sceneWidth, sceneHeight);
 
         controller = new Controller(scene, root);

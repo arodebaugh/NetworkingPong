@@ -1,11 +1,11 @@
 package sample;
 
 import javafx.geometry.Bounds;
+import javafx.geometry.Pos;
 import javafx.scene.Scene;
 import javafx.scene.control.Button;
 import javafx.scene.control.TextField;
-import javafx.scene.layout.HBox;
-import javafx.scene.layout.VBox;
+import javafx.scene.layout.*;
 import javafx.scene.paint.Color;
 import javafx.scene.shape.Circle;
 import javafx.scene.shape.Rectangle;
@@ -21,7 +21,7 @@ public class Controller {
     private static final int sceneWidth = 500;
     private static final int sceneHeight = 400;
 
-    private ArrayList<Shape> nodes;
+    private Pane nodes;
     private double mouseX;
     private double mouseY;
 
@@ -50,14 +50,14 @@ public class Controller {
     private Rectangle[] leftBreak = new Rectangle[10];
     private Rectangle[] rightBreak = new Rectangle[10];
 
-    private HBox hbox;
+    private HBox connectPane;
     private Button connect;
     private TextField ip;
 
     public int player = 1;
 
     private Scene scene;
-    private Group root;
+    private BorderPane root;
 
     private SynchronizedQueue inQueue;
     private SynchronizedQueue outQueue;
@@ -67,11 +67,13 @@ public class Controller {
     private boolean serverMode;
     static boolean connected;
 
-    public Controller(Scene s, Group r) {
+    public Controller(Scene s, BorderPane r) {
         scene = s;
         root = r;
 
-        nodes = new ArrayList<>();
+        scene.setFill(Color.color(0, 0, 0));
+
+        nodes = new Pane();
 
         inQueue = new SynchronizedQueue();
         outQueue = new SynchronizedQueue();
@@ -87,6 +89,9 @@ public class Controller {
             rightPaddle = new Rectangle(sceneWidth - 70, mouseY, 10, 80);
         }
 
+        leftPaddle.setFill(Color.WHITE);
+        rightPaddle.setFill(Color.WHITE);
+
         leftWall = new Rectangle(0,0,5,sceneHeight + 50);
         rightWall = new Rectangle(sceneWidth - 5,0,5,sceneHeight + 50);
         topWall = new Rectangle(0,0,sceneWidth + 50,5);
@@ -95,50 +100,50 @@ public class Controller {
         for (int x = 0; x <= 9; x++) { // 5 a row
             if (x < 5) {
                 leftBreak[x] = new Rectangle(0, x * 82, 10, 80);
-            } else {
-                leftBreak[x] = new Rectangle(12, (x - 5) * 82, 10, 80);
-            }
-        }
-
-        for (int x = 0; x <= 9; x++) { // 5 a row
-            if (x < 5) {
                 rightBreak[x] = new Rectangle(sceneWidth - 10, x * 82, 10, 80);
             } else {
+                leftBreak[x] = new Rectangle(12, (x - 5) * 82, 10, 80);
                 rightBreak[x] = new Rectangle(sceneWidth - 22, (x - 5) * 82, 10, 80);
             }
+
+            leftBreak[x].setFill(Color.WHITE);
+            rightBreak[x].setFill(Color.WHITE);
         }
 
-        hbox = new HBox();
+        connectPane = new HBox();
         connect = new Button("START");
         ip = new TextField("");
 
-        leftWall.setFill(Color.WHITE);
-        rightWall.setFill(Color.WHITE);
-        topWall.setFill(Color.WHITE);
-        bottomWall.setFill(Color.WHITE);
+        leftWall.setFill(Color.BLACK);
+        rightWall.setFill(Color.BLACK);
+        topWall.setFill(Color.BLACK);
+        bottomWall.setFill(Color.BLACK);
 
-        nodes.add(ball);
-        nodes.add(leftPaddle);
-        nodes.add(rightPaddle);
-        nodes.add(leftWall);
-        nodes.add(rightWall);
-        nodes.add(topWall);
-        nodes.add(bottomWall);
+        ball.setFill(Color.WHITE);
+
+        nodes.getChildren().add(ball);
+        nodes.getChildren().add(leftPaddle);
+        nodes.getChildren().add(rightPaddle);
+        nodes.getChildren().add(leftWall);
+        nodes.getChildren().add(rightWall);
+        nodes.getChildren().add(topWall);
+        nodes.getChildren().add(bottomWall);
 
         for (int x = 0; x <= 9; x++) {
-            nodes.add(leftBreak[x]);
-            nodes.add(rightBreak[x]);
+            nodes.getChildren().add(leftBreak[x]);
+            nodes.getChildren().add(rightBreak[x]);
         }
 
-        hbox.getChildren().add(ip);
+        connectPane.getChildren().add(ip);
+        connectPane.getChildren().add(connect);
 
-        if (!serverMode) {
-            hbox.getChildren().add(connect);
-        }
+        connectPane.setAlignment(Pos.CENTER);
 
+        connectPane.setStyle("-fx-background-color: #000000;");
+        nodes.setStyle("-fx-background-color: #000000;");
 
-        root.getChildren().addAll(nodes);
-        root.getChildren().addAll(hbox);
+        root.setCenter(nodes);
+        root.setTop(connectPane);
     }
 
     void setServerMode() {
@@ -314,16 +319,16 @@ public class Controller {
             Bounds ballBounds = ball.getBoundsInParent();
 
             if (ballBounds.intersects(leftPaddleBounds)) {
-                if (ballSpeed < 6.0) {
-                    ballSpeed += 1;
+                if (ballSpeed < 5.0) { // Todo: Speed is a problem... Gosh Darn It!
+                    ballSpeed += .5;
                 }
 
                 relativeIntersectY = (ball.getLayoutY() + (5 / 2)) - ball.getLayoutX();
                 normalizedRelativeIntersectionY = (relativeIntersectY / (5 / 2));
                 bounceAngle = normalizedRelativeIntersectionY * 75;
             } else if (ballBounds.intersects(rightPaddleBounds)) {
-                if (ballSpeed < 6.0) {
-                    ballSpeed += 1;
+                if (ballSpeed < 5.0) {
+                    ballSpeed += .5;
                 }
 
                 relativeIntersectY = (ball.getLayoutY() + (5 / 2)) - ball.getLayoutX();
