@@ -19,7 +19,7 @@ import java.util.ArrayList;
 
 public class Controller {
     private static final int sceneWidth = 500;
-    private static final int sceneHeight = 400;
+    private static final int sceneHeight = 430;
 
     private Pane nodes;
     private double mouseX;
