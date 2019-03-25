@@ -4,6 +4,7 @@ import javafx.application.Platform;
 import javafx.scene.control.TextField;
 import javafx.scene.shape.Circle;
 import javafx.scene.shape.Rectangle;
+import javafx.scene.text.Text;
 
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
@@ -24,6 +25,7 @@ public class ConnectToNewClients implements Runnable {
     private Controller controller;
     private Circle ball;
     private TextField ip;
+    private Text score;
 
     // ConnectToNewClients is server's code that listens on ServerSocket's port for connecting clients
     // When a new client's connection is accepted:
@@ -31,7 +33,7 @@ public class ConnectToNewClients implements Runnable {
     //    2. a CommunicationOut thread is created to write data to that client (via outQueue)
     //    3. (if multi-cast): collect outputStreams together to outQueue writes data to ALL clients
 
-    ConnectToNewClients(Controller c, int port, SynchronizedQueue inQ, SynchronizedQueue outQ, int p, Rectangle pa, Circle b, TextField i) {
+    ConnectToNewClients(Controller c, int port, SynchronizedQueue inQ, SynchronizedQueue outQ, int p, Rectangle pa, Circle b, TextField i, Text s) {
         controller = c;
         connectionPort = port;
         inQueue = inQ;
@@ -43,6 +45,7 @@ public class ConnectToNewClients implements Runnable {
         player = p;
         paddle = pa;
         ip = i;
+        score = s;
     }
 
     public void run() {
@@ -93,7 +96,7 @@ public class ConnectToNewClients implements Runnable {
                 communicationOutThread.start();
 
                 //   Thread 2: handles communication FROM that client TO server
-                CommunicationIn communicationIn = new CommunicationIn(controller, socketServerSide, dataReader, inQueue, outQueue, player, paddle, ball);
+                CommunicationIn communicationIn = new CommunicationIn(controller, socketServerSide, dataReader, inQueue, outQueue, player, paddle, ball, score);
                 Thread communicationInThread = new Thread(communicationIn);
                 communicationInThread.start();
             }

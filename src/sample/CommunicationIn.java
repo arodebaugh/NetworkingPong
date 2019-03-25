@@ -4,6 +4,7 @@ import javafx.application.Platform;
 import javafx.scene.control.TextField;
 import javafx.scene.shape.Circle;
 import javafx.scene.shape.Rectangle;
+import javafx.scene.text.Text;
 
 import java.io.EOFException;
 import java.io.ObjectInputStream;
@@ -20,10 +21,11 @@ public class CommunicationIn implements Runnable {
     private Rectangle paddle;
     private Circle ball;
     private Controller controller;
+    private Text score;
 
     // CommunicationIn reads from a Socket and puts data into the Program's inQueue
 
-    CommunicationIn(Controller c, Socket s, ObjectInputStream in, SynchronizedQueue inQ, SynchronizedQueue outQ, int p, Rectangle pa, Circle b) {
+    CommunicationIn(Controller c, Socket s, ObjectInputStream in, SynchronizedQueue inQ, SynchronizedQueue outQ, int p, Rectangle pa, Circle b, Text sc) {
         controller = c;
         socket = s;
         messageReader = in;
@@ -35,6 +37,7 @@ public class CommunicationIn implements Runnable {
         player = p;
         paddle = pa;
         ball = b;
+        score = sc;
     }
 
     @Override
@@ -60,6 +63,7 @@ public class CommunicationIn implements Runnable {
 
                 if (finalMessage.sender() == player) {
                     if (finalMessage.data() == 9999) {
+                        controller.paused = false;
                         controller.start();
                     }
 
@@ -67,13 +71,18 @@ public class CommunicationIn implements Runnable {
                         controller.resetWalls();
                     }
 
+                    if (finalMessage.data() == 5555) {
+                        controller.disconnect();
+                    }
+
                     Platform.runLater(() -> {
                         System.out.println(finalMessage.data());
                         paddle.setY(finalMessage.data());
 
                         if (!serverMode) {
-                            controller.ballX = finalMessage.ballX();
-                            controller.ballY = finalMessage.ballY();
+                            score.setText(finalMessage.player0Score() + " - " + finalMessage.player1Score());
+                            controller.ball1X = finalMessage.ballX();
+                            controller.ball1Y = finalMessage.ballY();
                             ball.setLayoutX(finalMessage.ballX());
                             ball.setLayoutY(finalMessage.ballY());
                         }

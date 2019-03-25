@@ -9,13 +9,11 @@ import javafx.scene.layout.*;
 import javafx.scene.paint.Color;
 import javafx.scene.shape.Circle;
 import javafx.scene.shape.Rectangle;
-import javafx.scene.shape.Shape;
-import javafx.scene.Group;
+import javafx.scene.text.Text;
 
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.net.Socket;
-import java.util.ArrayList;
 
 public class Controller {
     private static final int sceneWidth = 500;
@@ -25,25 +23,23 @@ public class Controller {
     private double mouseX;
     private double mouseY;
 
-    double ballX = 100;
-    double ballY = 100;
-    private double ballVx = 0;
-    private double ballVy = 0;
-    private double ballSpeed = 4.0;
-    private double relativeIntersectY;
-    private double normalizedRelativeIntersectionY;
-    private double bounceAngle;
+    double ball1X = 100;
+    double ball1Y = 100;
+    private double ball1Vx = 0;
+    private double ball1Vy = 0;
+    private double ball1Speed = 4.0;
+    private double relativeIntersectY1;
+    private double normalizedRelativeIntersectionY1;
+    private double bounceAngle1;
 
     private double ms;
     private double lastTime = System.currentTimeMillis();
 
-    private Circle ball;
+    private Circle ball1;
 
     private Rectangle leftPaddle;
     private Rectangle rightPaddle;
 
-    private Rectangle leftWall;
-    private Rectangle rightWall;
     private Rectangle topWall;
     private Rectangle bottomWall;
 
@@ -51,10 +47,18 @@ public class Controller {
     private Rectangle[] rightBreak = new Rectangle[10];
 
     private HBox connectPane;
+    private HBox scorePane;
+
     private Button connect;
     private TextField ip;
+    private Button reset;
+    // private Button disconnect;
 
-    public int player = 1;
+    private Text score;
+
+    int player = 1;
+    int player0Score = 0;
+    int player1Score = 0;
 
     private Scene scene;
     private BorderPane root;
@@ -66,10 +70,13 @@ public class Controller {
 
     private boolean serverMode;
     static boolean connected;
+    private boolean stopTick;
+    boolean paused = false;
 
-    public Controller(Scene s, BorderPane r) {
+    Controller(Scene s, BorderPane r) {
         scene = s;
         root = r;
+        stopTick = false;
 
         scene.setFill(Color.color(0, 0, 0));
 
@@ -79,7 +86,7 @@ public class Controller {
         outQueue = new SynchronizedQueue();
         connected = false;
 
-        ball = new Circle(ballX, ballY, 15);
+        ball1 = new Circle(ball1X, ball1Y, 15);
 
         if (player == 0) {
             leftPaddle = new Rectangle(50, mouseY, 10, 80);
@@ -92,10 +99,8 @@ public class Controller {
         leftPaddle.setFill(Color.WHITE);
         rightPaddle.setFill(Color.WHITE);
 
-        leftWall = new Rectangle(0,0,5,sceneHeight + 50);
-        rightWall = new Rectangle(sceneWidth - 5,0,5,sceneHeight + 50);
-        topWall = new Rectangle(0,0,sceneWidth + 50,5);
-        bottomWall = new Rectangle(0,sceneHeight - 5,sceneWidth + 50,5);
+        topWall = new Rectangle(0,-10,sceneWidth + 10,15);
+        bottomWall = new Rectangle(0,sceneWidth - 125,sceneWidth + 10,15);
 
         for (int x = 0; x <= 9; x++) { // 5 a row
             if (x < 5) {
@@ -114,18 +119,23 @@ public class Controller {
         connect = new Button("START");
         ip = new TextField("");
 
-        leftWall.setFill(Color.BLACK);
-        rightWall.setFill(Color.BLACK);
-        topWall.setFill(Color.BLACK);
-        bottomWall.setFill(Color.BLACK);
+        scorePane = new HBox();
+        score = new Text("0 - 0");
+        reset = new Button("NEW GAME");
+        // disconnect = new Button("DISCONNECT");
 
-        ball.setFill(Color.WHITE);
+        topWall.setFill(Color.WHITE);
+        bottomWall.setFill(Color.WHITE);
 
-        nodes.getChildren().add(ball);
+        score.setFill(Color.WHITE);
+
+        score.setStyle("-fx-font-size: 20;");
+
+        ball1.setFill(Color.WHITE);
+
+        nodes.getChildren().add(ball1);
         nodes.getChildren().add(leftPaddle);
         nodes.getChildren().add(rightPaddle);
-        nodes.getChildren().add(leftWall);
-        nodes.getChildren().add(rightWall);
         nodes.getChildren().add(topWall);
         nodes.getChildren().add(bottomWall);
 
@@ -136,14 +146,24 @@ public class Controller {
 
         connectPane.getChildren().add(ip);
         connectPane.getChildren().add(connect);
+        connectPane.getChildren().add(reset);
+        // connectPane.getChildren().add(disconnect);
+
+        reset.setVisible(false);
+        // disconnect.setVisible(false);
+
+        scorePane.getChildren().add(score);
 
         connectPane.setAlignment(Pos.CENTER);
+        scorePane.setAlignment(Pos.CENTER);
 
         connectPane.setStyle("-fx-background-color: #000000;");
+        scorePane.setStyle("-fx-background-color: #000000;");
         nodes.setStyle("-fx-background-color: #000000;");
 
         root.setCenter(nodes);
         root.setTop(connectPane);
+        root.setBottom(scorePane);
     }
 
     void setServerMode() {
@@ -157,24 +177,37 @@ public class Controller {
     void disconnect() {
         connected = false;
         connect.setVisible(true);
+
+        // disconnect.setVisible(false);
+        reset.setVisible(false);
+
+        paused = true;
+
         lobby();
     }
 
-    void reset() {
+    void reset(boolean resetScore, boolean sendReset) {
         System.out.println("RESET");
-        ballX = 100;
-        ballY = 100;
-        ball.setLayoutX(100);
-        ball.setLayoutY(100);
-        ballSpeed = 3.0;
-        ballVx = 0;
-        ballVy = 0;
+        ball1X = 100;
+        ball1Y = 100;
+        ball1.setLayoutX(100);
+        ball1.setLayoutY(100);
+        ball1Speed = 3.0;
+        ball1Vx = 0;
+        ball1Vy = 0;
 
-        Message message = new Message(player, 7777, ballX, ballY);
-        boolean putSucceeded = outQueue.put(message);
-        while (!putSucceeded) {
-            Thread.currentThread().yield();
-            putSucceeded = outQueue.put(message);
+        if (resetScore) {
+            player0Score = 0;
+            player1Score = 0;
+        }
+
+        if (sendReset) {
+            Message message = new Message(player, 7777, ball1X, ball1Y, player0Score, player1Score);
+            boolean putSucceeded = outQueue.put(message);
+            while (!putSucceeded) {
+                Thread.currentThread().yield();
+                putSucceeded = outQueue.put(message);
+            }
         }
 
         resetWalls();
@@ -191,16 +224,19 @@ public class Controller {
     }
 
     void lobby() {
+        connect.setVisible(true);
+        ip.setVisible(true);
+
         if (serverMode) {
             connected = true;
 
             if (player == 0) {
-                ConnectToNewClients connectToNewClients = new ConnectToNewClients(this, 8080, inQueue, outQueue, 1, rightPaddle, ball, ip);
+                ConnectToNewClients connectToNewClients = new ConnectToNewClients(this, 8080, inQueue, outQueue, 1, rightPaddle, ball1, ip, score);
                 Thread connectThread = new Thread(connectToNewClients);
                 connectThread.start();
             } else if (player == 1) {
                 //   Thread 2: handles communication FROM server TO client
-                ConnectToNewClients connectToNewClients = new ConnectToNewClients(this, 8080, inQueue, outQueue, 0, leftPaddle, ball, ip);
+                ConnectToNewClients connectToNewClients = new ConnectToNewClients(this, 8080, inQueue, outQueue, 0, leftPaddle, ball1, ip, score);
                 Thread connectThread = new Thread(connectToNewClients);
                 connectThread.start();
             }
@@ -209,7 +245,14 @@ public class Controller {
         connect.setOnAction(event -> {
             connect.setVisible(false);
             ip.setVisible(false);
+            if (serverMode) {
+                reset.setVisible(true);
+                // disconnect.setVisible(true);
+            }
+
             connected = true;
+
+            reset(true, true);
 
             if (!serverMode) {
                 // We're a client: connect to a server
@@ -229,12 +272,12 @@ public class Controller {
 
                     if (player == 0) {
                         //   Thread 2: handles communication FROM server TO client
-                        CommunicationIn communicationIn = new CommunicationIn(this, socketClientSide, new ObjectInputStream(socketClientSide.getInputStream()), inQueue, null, 1, rightPaddle, ball);
+                        CommunicationIn communicationIn = new CommunicationIn(this, socketClientSide, new ObjectInputStream(socketClientSide.getInputStream()), inQueue, null, 1, rightPaddle, ball1, score);
                         Thread communicationInThread = new Thread(communicationIn);
                         communicationInThread.start();
                     } else if (player == 1) {
                         //   Thread 2: handles communication FROM server TO client
-                        CommunicationIn communicationIn = new CommunicationIn(this, socketClientSide, new ObjectInputStream(socketClientSide.getInputStream()), inQueue, null, 0, leftPaddle, ball);
+                        CommunicationIn communicationIn = new CommunicationIn(this, socketClientSide, new ObjectInputStream(socketClientSide.getInputStream()), inQueue, null, 0, leftPaddle, ball1, score);
                         Thread communicationInThread = new Thread(communicationIn);
                         communicationInThread.start();
                     }
@@ -246,7 +289,7 @@ public class Controller {
                 // We connected!
             }
 
-            Message message = new Message(player, 9999, ballX, ballY);
+            Message message = new Message(player, 9999, ball1X, ball1Y, player0Score, player1Score);
             boolean putSucceeded = outQueue.put(message);
             while (!putSucceeded) {
                 Thread.currentThread().yield();
@@ -256,9 +299,11 @@ public class Controller {
     }
 
     void start() {
+        Thread draw;
+
         setListeners();
 
-        Thread draw = new Thread(() -> {
+        draw = new Thread(() -> {
             while (true) {
                 tick();
                 try {
@@ -272,16 +317,41 @@ public class Controller {
     }
 
     private void tick() {
-        if (serverMode) {
-            setBallPosition();
-            testBounds();
+        if (stopTick || !connected || paused) {
+            return;
         }
-        walls();
-        sendToServer();
+
+        try {
+            walls();
+            if (serverMode) {
+                testBounds();
+                setBallPosition();
+            }
+            sendToServer();
+        } catch (Exception ex) {
+            stopTick = true;
+            ex.printStackTrace();
+        }
+
+        reset.setOnAction(event -> {
+            reset(true, true);
+        });
+
+        /*disconnect.setOnAction(event -> {
+            Message message = new Message(player, 5555, ball1X, ball1Y, player0Score, player1Score);
+
+            boolean putSucceeded = outQueue.put(message);
+            while (!putSucceeded) {
+                Thread.currentThread().yield();
+                putSucceeded = outQueue.put(message);
+            }
+
+            disconnect();
+        });*/
     }
 
     private void sendToServer() {
-        Message message = new Message(player, (int) Math.round(mouseY), ballX, ballY);
+        Message message = new Message(player, (int) Math.round(mouseY), ball1X, ball1Y, player0Score, player1Score);
 
         boolean putSucceeded = outQueue.put(message);
         while (!putSucceeded) {
@@ -291,19 +361,19 @@ public class Controller {
     }
 
     private void walls() {
-        Bounds ballBounds = ball.getBoundsInParent();
+        Bounds ballBounds = ball1.getBoundsInParent();
 
         for (int x = 0; x <= 9; x++) {
             if (ballBounds.intersects(leftBreak[x].getBoundsInParent())) {
-                relativeIntersectY = (ball.getLayoutY() + (5/2)) - ball.getLayoutX();
-                normalizedRelativeIntersectionY = (relativeIntersectY / (5/2));
-                bounceAngle = normalizedRelativeIntersectionY * 75;
+                relativeIntersectY1 = (ball1.getLayoutY() + (80/2)) - ball1.getLayoutX();
+                normalizedRelativeIntersectionY1 = (relativeIntersectY1 / (80/2));
+                bounceAngle1 = normalizedRelativeIntersectionY1 * 75;
                 leftBreak[x].setWidth(0);
                 leftBreak[x].setHeight(0);
             } else if (ballBounds.intersects(rightBreak[x].getBoundsInParent())) {
-                relativeIntersectY = (ball.getLayoutY() + (5 / 2)) - ball.getLayoutX();
-                normalizedRelativeIntersectionY = (relativeIntersectY / (5 / 2));
-                bounceAngle = normalizedRelativeIntersectionY * 75;
+                relativeIntersectY1 = (ball1.getLayoutY() + (80 / 2)) - ball1.getLayoutX();
+                normalizedRelativeIntersectionY1 = (relativeIntersectY1 / (80 / 2));
+                bounceAngle1 = normalizedRelativeIntersectionY1 * 75;
                 rightBreak[x].setWidth(0);
                 rightBreak[x].setHeight(0);
             }
@@ -316,54 +386,72 @@ public class Controller {
             Bounds rightPaddleBounds = rightPaddle.getBoundsInParent();
             Bounds topWallBounds = topWall.getBoundsInParent();
             Bounds bottomWallBounds = bottomWall.getBoundsInParent();
-            Bounds ballBounds = ball.getBoundsInParent();
+            Bounds ballBounds = ball1.getBoundsInParent();
 
             if (ballBounds.intersects(leftPaddleBounds)) {
-                if (ballSpeed < 5.0) { // Todo: Speed is a problem... Gosh Darn It!
-                    ballSpeed += .5;
+                if (ball1Speed < 7.0) { // Todo: Speed is a problem... Gosh Darn It!
+                    ball1Speed += .5;
                 }
 
-                relativeIntersectY = (ball.getLayoutY() + (5 / 2)) - ball.getLayoutX();
-                normalizedRelativeIntersectionY = (relativeIntersectY / (5 / 2));
-                bounceAngle = normalizedRelativeIntersectionY * 75;
+                relativeIntersectY1 = (ball1.getLayoutY() + (80 / 2)) - ball1.getLayoutX();
+                normalizedRelativeIntersectionY1 = (relativeIntersectY1 / (80 / 2));
+                bounceAngle1 = normalizedRelativeIntersectionY1 * 75;
             } else if (ballBounds.intersects(rightPaddleBounds)) {
-                if (ballSpeed < 5.0) {
-                    ballSpeed += .5;
+                if (ball1Speed < 7.0) {
+                    ball1Speed += .5;
                 }
 
-                relativeIntersectY = (ball.getLayoutY() + (5 / 2)) - ball.getLayoutX();
-                normalizedRelativeIntersectionY = (relativeIntersectY / (5 / 2));
-                bounceAngle = normalizedRelativeIntersectionY * 75;
+                relativeIntersectY1 = (ball1.getLayoutY() + (80 / 2)) - ball1.getLayoutX();
+                normalizedRelativeIntersectionY1 = (relativeIntersectY1/ (80 / 2));
+                bounceAngle1 = normalizedRelativeIntersectionY1 * 75;
             } else if (ballBounds.intersects(bottomWallBounds)) {
-                relativeIntersectY = (ball.getLayoutY() + (5 / 2)) - ball.getLayoutX();
-                normalizedRelativeIntersectionY = (relativeIntersectY / (5 / 2));
-                bounceAngle = normalizedRelativeIntersectionY * 75;
+                relativeIntersectY1 = (ball1.getLayoutY() + (40 / 2)) - ball1.getLayoutX();
+                normalizedRelativeIntersectionY1 = (relativeIntersectY1 / (80 / 2));
+                bounceAngle1 = normalizedRelativeIntersectionY1 * 75;
             } else if (ballBounds.intersects(topWallBounds)) {
-                relativeIntersectY = (ball.getLayoutY() + (5 / 2)) - ball.getLayoutX();
-                normalizedRelativeIntersectionY = (relativeIntersectY / (5 / 2));
-                bounceAngle = normalizedRelativeIntersectionY * 75;
-            } else if (ball.getLayoutX() > (sceneWidth + 20)) { // player 0 scores
-                reset();
+                relativeIntersectY1 = (ball1.getLayoutY() + (40 / 2)) - ball1.getLayoutX();
+                normalizedRelativeIntersectionY1 = (relativeIntersectY1 / (80 / 2));
+                bounceAngle1 = normalizedRelativeIntersectionY1 * 75;
+            } else if (ball1.getLayoutX() > (sceneWidth + 20)) { // player 1 scores
+                player0Score += 1;
+                reset(false, true);
                 return;
-            } else if (ball.getLayoutX() < -100) { // player 1 scores
-                reset();
+            } else if (ball1.getLayoutX() < -100) { // player 0 scores
+                player1Score += 1;
+                reset(false, true);
                 return;
             }
 
-            ballVx = (ballSpeed * Math.cos(bounceAngle));
-            ballVy = (ballSpeed * -Math.sin(bounceAngle));
+            /*if (player0Score > 10 || player1Score > 10) {
+                Message message = new Message(player, 5555, ball1X, ball1Y, player0Score, player1Score);
+
+                boolean putSucceeded = outQueue.put(message);
+                while (!putSucceeded) {
+                    Thread.currentThread().yield();
+                    putSucceeded = outQueue.put(message);
+                }
+
+                disconnect();
+            }*/
+
+            score.setText(player0Score + " - " + player1Score);
+
+            System.out.println("0: " + player0Score + " 1: " + player1Score);
+
+            ball1Vx = (ball1Speed * Math.cos(bounceAngle1));
+            ball1Vy = (ball1Speed * -Math.sin(bounceAngle1));
 
         } catch (Exception ex) {
             ex.printStackTrace();
         }
     }
 
-    private void setBallPosition() {
-        ballX += ballVx;
-        ballY += ballVy;
+    private void setBallPosition() throws Exception {
+        ball1X += ball1Vx;
+        ball1Y += ball1Vy;
 
-        ball.setLayoutX(ballX);
-        ball.setLayoutY(ballY);
+        ball1.setLayoutX(ball1X);
+        ball1.setLayoutY(ball1Y);
     }
 
     private void setListeners() {
